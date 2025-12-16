@@ -1,3 +1,5 @@
+// Package relay 是 New API 的核心代理模块
+// 负责处理来自前端的请求，并将其路由到对应的 AI 服务提供商
 package relay
 
 import (
@@ -49,6 +51,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// GetAdaptor 根据 API 类型返回对应的适配器
+// 参数:
+//
+//	apiType: API 类型常量，如 APITypeOpenAI、APITypeAnthropic 等
+//
+// 返回值:
+//
+//	channel.Adaptor: 对应的渠道适配器实现，如果找不到则返回 nil
+//
+// 说明:
+//
+//	每个适配器负责将通用请求转换为特定 AI 服务商的请求格式
 func GetAdaptor(apiType int) channel.Adaptor {
 	switch apiType {
 	case constant.APITypeAli:
@@ -110,7 +124,7 @@ func GetAdaptor(apiType int) channel.Adaptor {
 	case constant.APITypeJimeng:
 		return &jimeng.Adaptor{}
 	case constant.APITypeMoonshot:
-		return &moonshot.Adaptor{} // Moonshot uses Claude API
+		return &moonshot.Adaptor{} // Moonshot 使用 Claude API 兼容协议
 	case constant.APITypeSubmodel:
 		return &submodel.Adaptor{}
 	case constant.APITypeMiniMax:
@@ -121,6 +135,18 @@ func GetAdaptor(apiType int) channel.Adaptor {
 	return nil
 }
 
+// GetTaskPlatform 从 Gin 上下文中获取任务平台标识
+// 参数:
+//
+//	c: Gin 上下文对象
+//
+// 返回值:
+//
+//	constant.TaskPlatform: 任务平台的字符串标识符
+//
+// 说明:
+//
+//	优先使用 channel_type，如果不存在则使用 platform 字段
 func GetTaskPlatform(c *gin.Context) constant.TaskPlatform {
 	channelType := c.GetInt("channel_type")
 	if channelType > 0 {
@@ -129,6 +155,18 @@ func GetTaskPlatform(c *gin.Context) constant.TaskPlatform {
 	return constant.TaskPlatform(c.GetString("platform"))
 }
 
+// GetTaskAdaptor 根据任务平台返回对应的任务适配器
+// 参数:
+//
+//	platform: 任务平台标识，可以是平台名称或渠道类型的字符串
+//
+// 返回值:
+//
+//	channel.TaskAdaptor: 对应的任务适配器实现，如果找不到则返回 nil
+//
+// 说明:
+//
+//	支持图片/视频生成等异步任务的平台，如 Suno、Kling、Vidu 等
 func GetTaskAdaptor(platform constant.TaskPlatform) channel.TaskAdaptor {
 	switch platform {
 	//case constant.APITypeAIProxyLibrary:
@@ -136,6 +174,7 @@ func GetTaskAdaptor(platform constant.TaskPlatform) channel.TaskAdaptor {
 	case constant.TaskPlatformSuno:
 		return &suno.TaskAdaptor{}
 	}
+	// 尝试将 platform 解析为渠道类型数字
 	if channelType, err := strconv.ParseInt(string(platform), 10, 64); err == nil {
 		switch channelType {
 		case constant.ChannelTypeAli:
