@@ -1,3 +1,4 @@
+// Package service 包含业务逻辑层服务
 package service
 
 import (
@@ -24,21 +25,32 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// TokenDetails Token 详情结构，区分文本和音频 token
 type TokenDetails struct {
-	TextTokens  int
-	AudioTokens int
+	TextTokens  int // 文本 token 数量
+	AudioTokens int // 音频 token 数量
 }
 
+// QuotaInfo 配额计算信息结构
 type QuotaInfo struct {
-	InputDetails  TokenDetails
-	OutputDetails TokenDetails
-	ModelName     string
-	UsePrice      bool
-	ModelPrice    float64
-	ModelRatio    float64
-	GroupRatio    float64
+	InputDetails  TokenDetails // 输入 token 详情
+	OutputDetails TokenDetails // 输出 token 详情
+	ModelName     string       // 模型名称
+	UsePrice      bool         // 是否使用价格计费
+	ModelPrice    float64      // 模型价格
+	ModelRatio    float64      // 模型倍率
+	GroupRatio    float64      // 分组倍率
 }
 
+// hasCustomModelRatio 检查模型是否有自定义倍率
+// 参数:
+//
+//	modelName: 模型名称
+//	currentRatio: 当前倍率
+//
+// 返回值:
+//
+//	bool: true 表示有自定义倍率
 func hasCustomModelRatio(modelName string, currentRatio float64) bool {
 	defaultRatio, exists := ratio_setting.GetDefaultModelRatioMap()[modelName]
 	if !exists {
@@ -47,8 +59,22 @@ func hasCustomModelRatio(modelName string, currentRatio float64) bool {
 	return currentRatio != defaultRatio
 }
 
+// calculateAudioQuota 计算音频模型的配额消耗
+// 参数:
+//
+//	info: 配额计算信息
+//
+// 返回值:
+//
+//	int: 计算出的配额值
+//
+// 说明:
+//  1. 如果使用价格计费，直接使用模型价格计算
+//  2. 否则使用 token 数量 * 倍率计算，区分文本和音频 token
 func calculateAudioQuota(info QuotaInfo) int {
+	// 如果使用价格计费，直接按价格计算
 	if info.UsePrice {
+		// 使用高精度 decimal 计算，避免浮点数误差
 		modelPrice := decimal.NewFromFloat(info.ModelPrice)
 		quotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
 		groupRatio := decimal.NewFromFloat(info.GroupRatio)
@@ -57,9 +83,10 @@ func calculateAudioQuota(info QuotaInfo) int {
 		return int(quota.IntPart())
 	}
 
-	completionRatio := decimal.NewFromFloat(ratio_setting.GetCompletionRatio(info.ModelName))
-	audioRatio := decimal.NewFromFloat(ratio_setting.GetAudioRatio(info.ModelName))
-	audioCompletionRatio := decimal.NewFromFloat(ratio_setting.GetAudioCompletionRatio(info.ModelName))
+	// 获取各种倍率
+	completionRatio := decimal.NewFromFloat(ratio_setting.GetCompletionRatio(info.ModelName))           // 输出 token 倍率
+	audioRatio := decimal.NewFromFloat(ratio_setting.GetAudioRatio(info.ModelName))                     // 输入音频 token 倍率
+	audioCompletionRatio := decimal.NewFromFloat(ratio_setting.GetAudioCompletionRatio(info.ModelName)) // 输出音频 token 倍率
 
 	groupRatio := decimal.NewFromFloat(info.GroupRatio)
 	modelRatio := decimal.NewFromFloat(info.ModelRatio)

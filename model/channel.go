@@ -1,3 +1,4 @@
+// Package model 包含数据库模型定义和数据访问逻辑
 package model
 
 import (
@@ -18,53 +19,55 @@ import (
 	"gorm.io/gorm"
 )
 
+// Channel 渠道模型，表示一个 AI 服务提供商的渠道配置
 type Channel struct {
 	Id                 int     `json:"id"`
-	Type               int     `json:"type" gorm:"default:0"`
-	Key                string  `json:"key" gorm:"not null"`
-	OpenAIOrganization *string `json:"openai_organization"`
-	TestModel          *string `json:"test_model"`
-	Status             int     `json:"status" gorm:"default:1"`
-	Name               string  `json:"name" gorm:"index"`
-	Weight             *uint   `json:"weight" gorm:"default:0"`
-	CreatedTime        int64   `json:"created_time" gorm:"bigint"`
-	TestTime           int64   `json:"test_time" gorm:"bigint"`
-	ResponseTime       int     `json:"response_time"` // in milliseconds
-	BaseURL            *string `json:"base_url" gorm:"column:base_url;default:''"`
-	Other              string  `json:"other"`
-	Balance            float64 `json:"balance"` // in USD
-	BalanceUpdatedTime int64   `json:"balance_updated_time" gorm:"bigint"`
-	Models             string  `json:"models"`
-	Group              string  `json:"group" gorm:"type:varchar(64);default:'default'"`
-	UsedQuota          int64   `json:"used_quota" gorm:"bigint;default:0"`
-	ModelMapping       *string `json:"model_mapping" gorm:"type:text"`
+	Type               int     `json:"type" gorm:"default:0"`                           // 渠道类型，如 OpenAI、Claude 等
+	Key                string  `json:"key" gorm:"not null"`                             // API 密钥，支持多行（多密钥模式）
+	OpenAIOrganization *string `json:"openai_organization"`                             // OpenAI 组织 ID
+	TestModel          *string `json:"test_model"`                                      // 测试时使用的模型
+	Status             int     `json:"status" gorm:"default:1"`                         // 渠道状态：1-启用，2-禁用
+	Name               string  `json:"name" gorm:"index"`                               // 渠道名称
+	Weight             *uint   `json:"weight" gorm:"default:0"`                         // 权重，用于负载均衡
+	CreatedTime        int64   `json:"created_time" gorm:"bigint"`                      // 创建时间戳
+	TestTime           int64   `json:"test_time" gorm:"bigint"`                         // 最后测试时间
+	ResponseTime       int     `json:"response_time"`                                   // 响应时间（毫秒）
+	BaseURL            *string `json:"base_url" gorm:"column:base_url;default:''"`      // 自定义 API 基础 URL
+	Other              string  `json:"other"`                                           // 其他配置（JSON 格式）
+	Balance            float64 `json:"balance"`                                         // 余额（美元）
+	BalanceUpdatedTime int64   `json:"balance_updated_time" gorm:"bigint"`              // 余额更新时间
+	Models             string  `json:"models"`                                          // 支持的模型列表（逗号分隔）
+	Group              string  `json:"group" gorm:"type:varchar(64);default:'default'"` // 所属分组
+	UsedQuota          int64   `json:"used_quota" gorm:"bigint;default:0"`              // 已使用配额
+	ModelMapping       *string `json:"model_mapping" gorm:"type:text"`                  // 模型映射配置
 	//MaxInputTokens     *int    `json:"max_input_tokens" gorm:"default:0"`
-	StatusCodeMapping *string `json:"status_code_mapping" gorm:"type:varchar(1024);default:''"`
-	Priority          *int64  `json:"priority" gorm:"bigint;default:0"`
-	AutoBan           *int    `json:"auto_ban" gorm:"default:1"`
-	OtherInfo         string  `json:"other_info"`
-	Tag               *string `json:"tag" gorm:"index"`
-	Setting           *string `json:"setting" gorm:"type:text"` // 渠道额外设置
-	ParamOverride     *string `json:"param_override" gorm:"type:text"`
-	HeaderOverride    *string `json:"header_override" gorm:"type:text"`
-	Remark            *string `json:"remark" gorm:"type:varchar(255)" validate:"max=255"`
+	StatusCodeMapping *string `json:"status_code_mapping" gorm:"type:varchar(1024);default:''"` // HTTP 状态码映射
+	Priority          *int64  `json:"priority" gorm:"bigint;default:0"`                         // 优先级，用于重试排序
+	AutoBan           *int    `json:"auto_ban" gorm:"default:1"`                                // 是否自动封禁
+	OtherInfo         string  `json:"other_info"`                                               // 其他信息
+	Tag               *string `json:"tag" gorm:"index"`                                         // 标签，用于批量管理
+	Setting           *string `json:"setting" gorm:"type:text"`                                 // 渠道额外设置
+	ParamOverride     *string `json:"param_override" gorm:"type:text"`                          // 参数覆盖配置
+	HeaderOverride    *string `json:"header_override" gorm:"type:text"`                         // 请求头覆盖配置
+	Remark            *string `json:"remark" gorm:"type:varchar(255)" validate:"max=255"`       // 备注
 	// add after v0.8.5
-	ChannelInfo ChannelInfo `json:"channel_info" gorm:"type:json"`
+	ChannelInfo ChannelInfo `json:"channel_info" gorm:"type:json"` // 渠道详细信息（多密钥模式等）
 
-	OtherSettings string `json:"settings" gorm:"column:settings"` // 其他设置，存储azure版本等不需要检索的信息，详见dto.ChannelOtherSettings
+	OtherSettings string `json:"settings" gorm:"column:settings"` // 其他设置，存储 Azure 版本等不需要检索的信息，详见 dto.ChannelOtherSettings
 
 	// cache info
-	Keys []string `json:"-" gorm:"-"`
+	Keys []string `json:"-" gorm:"-"` // 缓存的密钥列表（不存储到数据库）
 }
 
+// ChannelInfo 渠道详细信息，支持多密钥模式
 type ChannelInfo struct {
-	IsMultiKey             bool                  `json:"is_multi_key"`                        // 是否多Key模式
-	MultiKeySize           int                   `json:"multi_key_size"`                      // 多Key模式下的Key数量
-	MultiKeyStatusList     map[int]int           `json:"multi_key_status_list"`               // key状态列表，key index -> status
-	MultiKeyDisabledReason map[int]string        `json:"multi_key_disabled_reason,omitempty"` // key禁用原因列表，key index -> reason
-	MultiKeyDisabledTime   map[int]int64         `json:"multi_key_disabled_time,omitempty"`   // key禁用时间列表，key index -> time
-	MultiKeyPollingIndex   int                   `json:"multi_key_polling_index"`             // 多Key模式下轮询的key索引
-	MultiKeyMode           constant.MultiKeyMode `json:"multi_key_mode"`
+	IsMultiKey             bool                  `json:"is_multi_key"`                        // 是否多 Key 模式
+	MultiKeySize           int                   `json:"multi_key_size"`                      // 多 Key 模式下的 Key 数量
+	MultiKeyStatusList     map[int]int           `json:"multi_key_status_list"`               // key 状态列表，key index -> status
+	MultiKeyDisabledReason map[int]string        `json:"multi_key_disabled_reason,omitempty"` // key 禁用原因列表，key index -> reason
+	MultiKeyDisabledTime   map[int]int64         `json:"multi_key_disabled_time,omitempty"`   // key 禁用时间列表，key index -> time
+	MultiKeyPollingIndex   int                   `json:"multi_key_polling_index"`             // 多 Key 模式下轮询的 key 索引
+	MultiKeyMode           constant.MultiKeyMode `json:"multi_key_mode"`                      // 多 Key 模式：轮询或随机
 }
 
 // Value implements driver.Valuer interface
@@ -78,15 +81,24 @@ func (c *ChannelInfo) Scan(value interface{}) error {
 	return common.Unmarshal(bytesValue, c)
 }
 
+// GetKeys 获取渠道的所有密钥
+// 返回值:
+//
+//	[]string: 密钥列表
+//
+// 说明:
+//  1. 如果密钥以 '[' 开头，尝试作为 JSON 数组解析（如 Vertex AI 场景）
+//  2. 否则按换行符分割多个密钥
 func (channel *Channel) GetKeys() []string {
 	if channel.Key == "" {
 		return []string{}
 	}
+	// 如果已经缓存了密钥列表，直接返回
 	if len(channel.Keys) > 0 {
 		return channel.Keys
 	}
 	trimmed := strings.TrimSpace(channel.Key)
-	// If the key starts with '[', try to parse it as a JSON array (e.g., for Vertex AI scenarios)
+	// 如果密钥以 '[' 开头，尝试作为 JSON 数组解析（用于 Vertex AI 等场景）
 	if strings.HasPrefix(trimmed, "[") {
 		var arr []json.RawMessage
 		if err := common.Unmarshal([]byte(trimmed), &arr); err == nil {
@@ -97,30 +109,41 @@ func (channel *Channel) GetKeys() []string {
 			return res
 		}
 	}
-	// Otherwise, fall back to splitting by newline
+	// 否则按换行符分割
 	keys := strings.Split(strings.Trim(channel.Key, "\n"), "\n")
 	return keys
 }
 
+// GetNextEnabledKey 获取下一个启用的密钥
+// 返回值:
+//
+//	string: 密钥字符串
+//	int: 密钥索引
+//	*types.NewAPIError: 如果没有可用密钥则返回错误
+//
+// 说明:
+//  1. 如果不是多密钥模式，直接返回原始密钥
+//  2. 多密钥模式支持两种方式：轮询（polling）和随机（random）
 func (channel *Channel) GetNextEnabledKey() (string, int, *types.NewAPIError) {
-	// If not in multi-key mode, return the original key string directly.
+	// 如果不是多密钥模式，直接返回原始密钥字符串
 	if !channel.ChannelInfo.IsMultiKey {
 		return channel.Key, 0, nil
 	}
 
-	// Obtain all keys (split by \n)
+	// 获取所有密钥（按 \n 分割）
 	keys := channel.GetKeys()
 	if len(keys) == 0 {
-		// No keys available, return error, should disable the channel
+		// 没有可用密钥，返回错误，应该禁用此渠道
 		return "", 0, types.NewError(errors.New("no keys available"), types.ErrorCodeChannelNoAvailableKey)
 	}
 
+	// 获取渠道轮询锁，确保线程安全
 	lock := GetChannelPollingLock(channel.Id)
 	lock.Lock()
 	defer lock.Unlock()
 
 	statusList := channel.ChannelInfo.MultiKeyStatusList
-	// helper to get key status, default to enabled when missing
+	// 辅助函数：获取密钥状态，默认为启用
 	getStatus := func(idx int) int {
 		if statusList == nil {
 			return common.ChannelStatusEnabled
@@ -131,27 +154,26 @@ func (channel *Channel) GetNextEnabledKey() (string, int, *types.NewAPIError) {
 		return common.ChannelStatusEnabled
 	}
 
-	// Collect indexes of enabled keys
+	// 收集启用的密钥索引
 	enabledIdx := make([]int, 0, len(keys))
 	for i := range keys {
 		if getStatus(i) == common.ChannelStatusEnabled {
 			enabledIdx = append(enabledIdx, i)
 		}
 	}
-	// If no specific status list or none enabled, return an explicit error so caller can
-	// properly handle a channel with no available keys (e.g. mark channel disabled).
-	// Returning the first key here caused requests to keep using an already-disabled key.
+	// 如果没有启用的密钥，返回明确错误，以便调用者可以正确处理（如禁用渠道）
 	if len(enabledIdx) == 0 {
 		return "", 0, types.NewError(errors.New("no enabled keys"), types.ErrorCodeChannelNoAvailableKey)
 	}
 
+	// 根据多密钥模式选择密钥
 	switch channel.ChannelInfo.MultiKeyMode {
 	case constant.MultiKeyModeRandom:
-		// Randomly pick one enabled key
+		// 随机选择一个启用的密钥
 		selectedIdx := enabledIdx[rand.Intn(len(enabledIdx))]
 		return keys[selectedIdx], selectedIdx, nil
 	case constant.MultiKeyModePolling:
-		// Use channel-specific lock to ensure thread-safe polling
+		// 使用渠道特定锁确保线程安全的轮询
 
 		channelInfo, err := CacheGetChannelInfo(channel.Id)
 		if err != nil {
@@ -162,37 +184,47 @@ func (channel *Channel) GetNextEnabledKey() (string, int, *types.NewAPIError) {
 			if common.DebugEnabled {
 				println(fmt.Sprintf("channel %d polling index: %d", channel.Id, channel.ChannelInfo.MultiKeyPollingIndex))
 			}
+			// 如果未启用内存缓存，保存轮询索引到数据库
 			if !common.MemoryCacheEnabled {
 				_ = channel.SaveChannelInfo()
 			} else {
 				// CacheUpdateChannel(channel)
 			}
 		}()
-		// Start from the saved polling index and look for the next enabled key
+		// 从保存的轮询索引开始，查找下一个启用的密钥
 		start := channelInfo.MultiKeyPollingIndex
 		if start < 0 || start >= len(keys) {
 			start = 0
 		}
+		// 循环查找启用的密钥
 		for i := 0; i < len(keys); i++ {
 			idx := (start + i) % len(keys)
 			if getStatus(idx) == common.ChannelStatusEnabled {
-				// update polling index for next call (point to the next position)
+				// 更新轮询索引为下一个位置
 				channel.ChannelInfo.MultiKeyPollingIndex = (idx + 1) % len(keys)
 				return keys[idx], idx, nil
 			}
 		}
-		// Fallback – should not happen, but return first enabled key
+		// 退步方案：返回第一个启用的密钥（不应该发生）
 		return keys[enabledIdx[0]], enabledIdx[0], nil
 	default:
-		// Unknown mode, default to first enabled key (or original key string)
+		// 未知模式，默认返回第一个启用的密钥
 		return keys[enabledIdx[0]], enabledIdx[0], nil
 	}
 }
 
+// SaveChannelInfo 保存渠道信息到数据库
+// 返回值:
+//
+//	error: 如果保存失败则返回错误
 func (channel *Channel) SaveChannelInfo() error {
 	return DB.Model(channel).Update("channel_info", channel.ChannelInfo).Error
 }
 
+// GetModels 获取渠道支持的模型列表
+// 返回值:
+//
+//	[]string: 模型名称列表
 func (channel *Channel) GetModels() []string {
 	if channel.Models == "" {
 		return []string{}
